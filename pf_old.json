@@ -1,0 +1,12 @@
+{
+    "features": [
+            "PF_pt","PF_eta","PF_phi","PF_q","PF_dz","PF_dxy","PF_dxyerr","PF_pup","PF_pupnolep","PF_id"
+            ],
+    "altfeatures": [
+            "sv_dlen", "sv_dlenSig", "sv_dxy", "sv_dxySig", "sv_chi2", "sv_pAngle", "sv_x", "sv_y", "sv_z", "sv_pt", "sv_mass", "sv_eta", "sv_phi"
+            ],
+    "weight": ["fj_pt", "fj_msd"],
+    "cut": "fj_pt>300 && fj_msd>40",
+    "ss_vars": ["fj_n2b1","fj_deepTagZqq","fj_had1Decay","fj_had2Decay","MET_covXX","MET_covXY","MET_covYY","MET_phi","MET_pt","MET_significance","PuppiMET_pt","PuppiMET_phi","fj_eta","fj_phi"],
+    "!decayType":"fj_decayType"
+}
