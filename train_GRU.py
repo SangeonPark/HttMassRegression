@@ -124,6 +124,7 @@ bin_dict = {
 
 def load(iFile,columns=lColumns,target_name=target,test_train_split=0.2,doscale=True,iNparts=30,iNSVs=5,fillGenM=None,maxevts=0):
     h5File = h5py.File(iFile)
+    print(h5File)
     treeArray = h5File['deepDoubleTau'][()]
     print(treeArray)
     print(treeArray.shape)
@@ -138,7 +139,6 @@ def load(iFile,columns=lColumns,target_name=target,test_train_split=0.2,doscale=
         norm_op,norm_var = norm_settings[var]
         features_labels_df[var] = norm_op(features_labels_df[var],features_labels_df[norm_var])
 
-
     cutlist = cut.split(' && ')
     cut_var = [c.split('>')[0] for c in cutlist]
     cut_val = [c.split('>')[-1] for c in cutlist]
@@ -152,12 +152,12 @@ def load(iFile,columns=lColumns,target_name=target,test_train_split=0.2,doscale=
     for i0 in range(nparts):
         features_labels_df['PF_id'+str(i0)] = features_labels_df['PF_id'+str(i0)].map(idconv)
     selPartfeatures = []
-    for iVar in features:
-        for i0 in range(iNparts):
+    for i0 in range(iNparts):
+        for iVar in features:
             selPartfeatures.append(iVar+str(i0))
     selSVfeatures = []
-    for iVar in altfeatures:
-        for i0 in range(iNSVs):
+    for i0 in range(iNSVs):
+        for iVar in altfeatures:
             selSVfeatures.append(iVar+str(i0))
     selEvtfeatures = evt_feats
 
@@ -187,11 +187,22 @@ def load(iFile,columns=lColumns,target_name=target,test_train_split=0.2,doscale=
 
     print(features_df.shape)
     features_df = features_df.reshape(-1,iNparts,len(features))
+    #for inp in range(iNparts):
+    #    for inf in range(len(features)):
+    #        test_dat = features_df[0,inp,inf]
+    #        print('PF',inp,features[inf],test_dat)
     print(features_df.shape)
     print(features_sv_df.shape)
     features_sv_df = features_sv_df.reshape(-1,iNSVs,len(altfeatures))
+    #for inp in range(iNSVs):
+    #    for inf in range(len(altfeatures)):
+    #        test_dat = features_sv_df[0,inp,inf]
+    #        print('SV',inp,altfeatures[inf],test_dat)
     print(features_sv_df.shape)
     features_evt_df = features_evt_df.reshape(-1,len(evt_feats))
+    #for inf in range(len(evt_feats)):
+    #    test_dat = features_evt_df[0,inf]
+    #    print('Evt',inf,evt_feats[inf],test_dat)
     print(features_evt_df.shape)
     features_val = features_df
     features_sv_val = features_sv_df
@@ -276,7 +287,7 @@ def train(models,X_train,Xalt_train,Xevt_train,Y_train,feat_train,NEPOCHS=20,Oba
 
     early_stopping_callback = EarlyStopping(
         monitor="val_loss",
-        min_delta=0.05,
+        min_delta=0.1,
         patience=10,
         verbose=0,
         mode="min",
@@ -443,24 +454,20 @@ if __name__ == "__main__":
             theNN = hadelmuNN[:,0 if dtype=="hadhad" else 1 if dtype=="hadel" else 2]
 
             Y_pred = models[m].predict([X_test,Xalt_test,Xevt_test]).flatten()
-
-            print(len(theNN))
-            print(len(evtData[:,0]))
-            print(len(Xevt_test[:,0]))
-            print(len(Y_pred))
+            theNN = models[m].predict([pfData,svData,evtData]).flatten()
 
             print(evtData.shape)
-            print({evt_feats[ic]:evtData[0][ic] for ic in range(len(evt_feats))})
+            #print({evt_feats[ic]:evtData[0][ic] for ic in range(len(evt_feats))})
     
             for ic,col in enumerate(evt_feats):
                 plt.clf() 
                 _,thebins,_ = plt.hist(Xevt_test[:,ic],histtype='step',density=True,fill=False)
-                thebins = np.linspace(thebins[0] if np.quantile(Xevt_test[:,ic],0.5)<(thebins[0]+(thebins[-1]-thebins[0])*0.25) else np.quantile(Xevt_test[:,ic],0.05),thebins[-1] if np.quantile(Xevt_test[:,ic],0.95)>(thebins[0]+(thebins[-1]-thebins[0])*0.75) else np.quantile(Xevt_test[:,ic],0.95))
+                thebins = np.linspace(thebins[0] if np.quantile(Xevt_test[:,ic],0.05)<(thebins[0]+(thebins[-1]-thebins[0])*0.25) else np.quantile(Xevt_test[:,ic],0.05),thebins[-1] if np.quantile(Xevt_test[:,ic],0.95)>(thebins[0]+(thebins[-1]-thebins[0])*0.75) else np.quantile(Xevt_test[:,ic],0.95))
                 plt.clf()
                 plt.hist(Xevt_test[:,ic],bins=thebins,histtype='step',density=True,fill=False)
                 plt.hist(Xevt_test_htt[:,ic],bins=thebins,histtype='step',density=True,fill=False)
                 plt.hist(Xevt_test_ztt[:,ic],bins=thebins,histtype='step',density=True,fill=False)
-                plt.hist(evtData[:,ic][evtData[:,evt_feats.index('fj_msd')]>40.],bins=thebins,histtype='step',density=True,fill=False)
+                plt.hist(evtData[:,ic][np.abs(evtData[:,evt_feats.index('MET_phi')])<0.5],bins=thebins,histtype='step',density=True,fill=False)
                 plt.ylabel('arb.')
                 plt.xlabel(col)
                 plt.legend(['Flat Htt', 'ggHtt', 'Ztt', 'CMSSW'], loc='best')
@@ -470,9 +477,75 @@ if __name__ == "__main__":
 
                 plt.clf()
                 plt.hist2d(Xevt_test[:,ic],Y_pred,bins=[thebins,np.arange(10.,510.,10.)],density=True)
-                plt.plot(evtData[:,ic][(evtData[:,evt_feats.index('fj_msd')]>40.) & (evtData[:,evt_feats.index('fj_pt')]>300.)],theNN[(evtData[:,evt_feats.index('fj_msd')]>40.) & (evtData[:,evt_feats.index('fj_pt')]>300.)],'rx')
+                plt.plot(evtData[:,ic][np.abs(evtData[:,evt_feats.index('MET_phi')])<0.5],theNN[np.abs(evtData[:,evt_feats.index('MET_phi')])<0.5],'rx')
                 plt.ylabel('mreg')
                 plt.xlabel(col)
                 plt.savefig("plots/varcomp2d_%s_%s.pdf"%(dtype,col))
                 #plt.zscale('log')
                 #plt.savefig("plots/varcomp2d_%s_%s_logz.pdf"%(dtype,col))
+            for ic,col in enumerate(lSVfeatures):
+                ipn = ic % nsvs
+                ifn = int((ic - ipn)/nsvs)
+                plt.clf() 
+                _,thebins,_ = plt.hist(Xalt_test[:,ipn,ifn],histtype='step',density=True,fill=False)
+                thebins = np.linspace(thebins[0] if np.quantile(Xalt_test[:,ipn,ifn],0.05)<(thebins[0]+(thebins[-1]-thebins[0])*0.25) else np.quantile(Xalt_test[:,ipn,ifn],0.05),thebins[-1] if np.quantile(Xalt_test[:,ipn,ifn],0.95)>(thebins[0]+(thebins[-1]-thebins[0])*0.75) else np.quantile(Xalt_test[:,ipn,ifn],0.95))
+                plt.clf()
+                plt.hist(Xalt_test[:,ipn,ifn],bins=thebins,histtype='step',density=True,fill=False)
+                plt.hist(Xalt_test_htt[:,ipn,ifn],bins=thebins,histtype='step',density=True,fill=False)
+                plt.hist(Xalt_test_ztt[:,ipn,ifn],bins=thebins,histtype='step',density=True,fill=False)
+                plt.hist(svData[:,ipn,ifn][np.abs(evtData[:,evt_feats.index('MET_phi')])<0.5],bins=thebins,histtype='step',density=True,fill=False)
+                plt.ylabel('arb.')
+                plt.xlabel(col)
+                plt.legend(['Flat Htt', 'ggHtt', 'Ztt', 'CMSSW'], loc='best')
+                plt.savefig("plots/varcomp_%s_%s.pdf"%(dtype,col))
+                plt.yscale('log')
+                plt.savefig("plots/varcomp_%s_%s_logy.pdf"%(dtype,col))
+
+                plt.clf()
+                plt.hist2d(Xalt_test[:,ipn,ifn],Y_pred,bins=[thebins,np.arange(10.,510.,10.)],density=True)
+                plt.plot(svData[:,ipn,ifn][np.abs(evtData[:,evt_feats.index('MET_phi')])<0.5],theNN[np.abs(evtData[:,evt_feats.index('MET_phi')])<0.5],'rx')
+                plt.ylabel('mreg')
+                plt.xlabel(col)
+                plt.savefig("plots/varcomp2d_%s_%s.pdf"%(dtype,col))
+                #plt.zscale('log')
+                #plt.savefig("plots/varcomp2d_%s_%s_logz.pdf"%(dtype,col))
+            print(X_test.shape)
+            print(pfData.shape)
+            for ic,col in enumerate(lPartfeatures):
+                ipn = ic % nparts
+                ifn = int((ic - ipn)/nparts)
+                #print(col,ipn,ifn,pfData[:,ipn,ifn][np.abs(evtData[:,evt_feats.index('MET_phi')])<0.5])
+                plt.clf() 
+                _,thebins,_ = plt.hist(X_test[:,ipn,ifn],histtype='step',density=True,fill=False)
+                thebins = np.linspace(thebins[0] if np.quantile(X_test[:,ipn,ifn],0.05)<(thebins[0]+(thebins[-1]-thebins[0])*0.25) else np.quantile(X_test[:,ipn,ifn],0.05),thebins[-1] if np.quantile(X_test[:,ipn,ifn],0.95)>(thebins[0]+(thebins[-1]-thebins[0])*0.75) else np.quantile(X_test[:,ipn,ifn],0.95))
+                plt.clf()
+                plt.hist(X_test[:,ipn,ifn],bins=thebins,histtype='step',density=True,fill=False)
+                plt.hist(X_test_htt[:,ipn,ifn],bins=thebins,histtype='step',density=True,fill=False)
+                plt.hist(X_test_ztt[:,ipn,ifn],bins=thebins,histtype='step',density=True,fill=False)
+                plt.hist(pfData[:,ipn,ifn][np.abs(evtData[:,evt_feats.index('MET_phi')])<0.5],bins=thebins,histtype='step',density=True,fill=False)
+                plt.ylabel('arb.')
+                plt.xlabel(col)
+                plt.legend(['Flat Htt', 'ggHtt', 'Ztt', 'CMSSW'], loc='best')
+                plt.savefig("plots/varcomp_%s_%s.pdf"%(dtype,col))
+                plt.yscale('log')
+                plt.savefig("plots/varcomp_%s_%s_logy.pdf"%(dtype,col))
+
+                plt.clf()
+                plt.hist2d(X_test[:,ipn,ifn],Y_pred,bins=[thebins,np.arange(10.,510.,10.)],density=True)
+                plt.plot(pfData[:,ipn,ifn][np.abs(evtData[:,evt_feats.index('MET_phi')])<0.5],theNN[np.abs(evtData[:,evt_feats.index('MET_phi')])<0.5],'rx')
+                plt.ylabel('mreg')
+                plt.xlabel(col)
+                plt.savefig("plots/varcomp2d_%s_%s.pdf"%(dtype,col))
+                #plt.zscale('log')
+                #plt.savefig("plots/varcomp2d_%s_%s_logz.pdf"%(dtype,col))
+
+            plt.clf()
+            thebins = np.arange(10.,510.,10.)
+            plt.hist(Y_pred,bins=thebins,histtype='step',density=True,fill=False)
+            plt.hist(theNN[np.abs(evtData[:,evt_feats.index('MET_phi')])<0.5],bins=thebins,histtype='step',density=True,fill=False)
+            plt.ylabel('arb.')
+            plt.xlabel('NN mass')
+            plt.legend(['Flat Htt', 'CMSSW'], loc='best')
+            plt.savefig("plots/varcomp_%s_nnmass.pdf"%(dtype))
+            plt.yscale('log')
+            plt.savefig("plots/varcomp_%s_nnmass_logy.pdf"%(dtype))
